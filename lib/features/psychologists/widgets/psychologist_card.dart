@@ -7,10 +7,20 @@ import '../../../shared/theme/app_colors.dart';
 /// design.md: avatar + stacked name/subtitle, whole row tappable, trailing
 /// chevron instead of a boxed card.
 class PsychologistCard extends StatelessWidget {
-  const PsychologistCard({super.key, required this.psicologo, this.onTap});
+  const PsychologistCard({super.key, required this.psicologo, this.onTap, this.compatibility});
 
   final Psicologo psicologo;
   final VoidCallback? onTap;
+
+  /// Compatibility score (0-100) with the user, from `compatibilityScore`
+  /// in `psychologist_matching.dart`. Null hides the badge.
+  final int? compatibility;
+
+  Color _compatibilityColor(int score) {
+    if (score >= 75) return const Color(0xFF8AA68C);
+    if (score >= 50) return const Color(0xFFD8A657);
+    return const Color(0xFFC97B63);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -68,6 +78,24 @@ class PsychologistCard extends StatelessWidget {
                 ],
               ),
             ),
+            if (compatibility != null) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: _compatibilityColor(compatibility!).withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  '$compatibility% match',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: _compatibilityColor(compatibility!),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
             Icon(Icons.chevron_right_rounded, color: secondaryColor),
           ],
         ),

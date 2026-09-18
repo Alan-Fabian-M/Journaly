@@ -1,3 +1,4 @@
+import '../models/activity_insight.dart';
 import '../models/journal.dart';
 
 /// Contract for everything journal-related, served by the real backend
@@ -25,4 +26,8 @@ abstract class JournalRepository {
     required String recommendationId,
     required bool wasHelpful,
   });
+
+  /// Activities the user mentioned repeatedly with negative valence —
+  /// candidates to suggest reducing. `GET /activity-insights`.
+  Future<List<ActivityInsight>> fetchActivitiesToReduce();
 }

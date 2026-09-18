@@ -1,3 +1,4 @@
+import '../../journal/models/emotion_result.dart';
 import '../models/psicologo.dart';
 
 /// Mock psychologist directory.
@@ -15,6 +16,7 @@ final List<Psicologo> mockPsicologos = [
         'Psicóloga clínica con 8 años de experiencia en manejo de ansiedad, '
         'estrés laboral y técnicas de regulación emocional.',
     availability: ['Lun 10:00', 'Mié 15:00', 'Vie 09:00'],
+    focusEmotions: [EmotionType.estres, EmotionType.ansiedad],
   ),
   Psicologo(
     id: 'p2',
@@ -26,6 +28,7 @@ final List<Psicologo> mockPsicologos = [
         'Especialista en procesos de duelo y acompañamiento emocional, '
         'con enfoque humanista.',
     availability: ['Mar 11:00', 'Jue 16:30'],
+    focusEmotions: [EmotionType.tristeza],
   ),
   Psicologo(
     id: 'p3',
@@ -37,6 +40,7 @@ final List<Psicologo> mockPsicologos = [
         'Trabaja con terapia cognitivo-conductual para construir hábitos '
         'saludables y mejorar el bienestar general.',
     availability: ['Lun 14:00', 'Mié 09:30', 'Sáb 10:00'],
+    focusEmotions: [EmotionType.calma, EmotionType.alegria],
   ),
   Psicologo(
     id: 'p4',
@@ -48,5 +52,6 @@ final List<Psicologo> mockPsicologos = [
         'Acompaña procesos de autoestima, relaciones interpersonales y '
         'comunicación asertiva.',
     availability: ['Mar 08:30', 'Vie 17:00'],
+    focusEmotions: [EmotionType.ansiedad, EmotionType.tristeza],
   ),
 ];

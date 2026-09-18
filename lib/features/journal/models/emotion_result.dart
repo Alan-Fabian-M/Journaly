@@ -19,18 +19,18 @@ extension EmotionTypeX on EmotionType {
     }
   }
 
-  IconData get icon {
+  String get emoji {
     switch (this) {
       case EmotionType.estres:
-        return Icons.bolt_rounded;
+        return '😰';
       case EmotionType.ansiedad:
-        return Icons.waves_rounded;
+        return '😟';
       case EmotionType.tristeza:
-        return Icons.water_drop_rounded;
+        return '😢';
       case EmotionType.calma:
-        return Icons.self_improvement_rounded;
+        return '😌';
       case EmotionType.alegria:
-        return Icons.wb_sunny_rounded;
+        return '😄';
     }
   }
 

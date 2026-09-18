@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/journal.dart';
 import '../providers/journal_provider.dart';
 import '../../../shared/theme/app_colors.dart';
+import '../../../shared/widgets/top_notice.dart';
 import '../widgets/date_carousel.dart';
 import '../widgets/journal_detail_sheet.dart';
 import '../widgets/mic_button.dart';
@@ -47,11 +48,10 @@ class _RecordJournalScreenState extends State<RecordJournalScreen> {
 
     if (journalOfDay != null) {
       showJournalDetailSheet(context, journalOfDay);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No tienes un journal registrado ese día')),
-      );
+      return;
     }
+
+    showTopNotice(context, 'No tienes un journal registrado ese día');
   }
 
   Future<void> _openTextJournalSheet(BuildContext context) async {
@@ -126,6 +126,7 @@ class _RecordJournalScreenState extends State<RecordJournalScreen> {
             DateCarousel(
               selectedDate: _selectedDate,
               onDateSelected: (date) => _onDateSelected(context, date),
+              journals: journalProvider.journals,
             ),
             const SizedBox(height: 16),
             Align(

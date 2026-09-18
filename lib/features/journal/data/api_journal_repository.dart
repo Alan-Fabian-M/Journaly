@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../../../shared/data/api_client.dart';
+import '../models/activity_insight.dart';
 import '../models/journal.dart';
 import 'journal_repository.dart';
 
@@ -41,5 +42,12 @@ class ApiJournalRepository implements JournalRepository {
       '/recommendations/$recommendationId/feedback',
       data: {'wasHelpful': wasHelpful},
     );
+  }
+
+  @override
+  Future<List<ActivityInsight>> fetchActivitiesToReduce() async {
+    final response = await _dio.get('/activity-insights');
+    final data = response.data as List;
+    return data.map((json) => ActivityInsight.fromJson(json as Map<String, dynamic>)).toList();
   }
 }

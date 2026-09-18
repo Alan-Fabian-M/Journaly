@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../shared/theme/app_colors.dart';
+import '../../journal/providers/journal_provider.dart';
 import '../providers/psychologist_provider.dart';
+import '../utils/psychologist_matching.dart';
 import '../widgets/psychologist_card.dart';
 import 'psychologist_detail_screen.dart';
 
@@ -13,7 +15,8 @@ class PsychologistsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final provider = context.watch<PsychologistProvider>();
-    final psicologos = provider.psicologos;
+    final journals = context.watch<JournalProvider>().journals;
+    final psicologos = sortedByCompatibility(provider.psicologos, journals);
 
     return SafeArea(
       child: ListView(
@@ -51,6 +54,7 @@ class PsychologistsScreen extends StatelessWidget {
             for (final psicologo in psicologos) ...[
               PsychologistCard(
                 psicologo: psicologo,
+                compatibility: compatibilityScore(psicologo, journals),
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(

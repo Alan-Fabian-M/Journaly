@@ -1,3 +1,4 @@
+import '../models/activity_insight.dart';
 import '../models/journal.dart';
 import 'ai_journal_service.dart';
 import 'journal_repository.dart';
@@ -48,5 +49,12 @@ class MockJournalRepository implements JournalRepository {
   }) async {
     // Mock journals never have real recommendedActions (no matching engine
     // client-side), so there's nothing to persist — no-op.
+  }
+
+  @override
+  Future<List<ActivityInsight>> fetchActivitiesToReduce() async {
+    // No mock `journal_activities` data to derive this from — real data
+    // only exists once the backend has clustered actual journal entries.
+    return [];
   }
 }

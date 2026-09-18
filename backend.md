@@ -226,10 +226,12 @@ Response `200`:
       "intensity": 0.58,
       "keywords": ["llamada de trabajo", "respiración"],
       "suggestions": ["...", "..."]
-    }
+    },
+    "activitiesToAvoid": ["reunión de trabajo"]
   }
 ]
 ```
+`activitiesToAvoid` son las actividades mencionadas en ESE journal con `valence: 'negativa'` (de `journal_activities`, sección 2) — "qué evitar" específico de esa entrada, el inverso de `emotionResult.suggestions`. No confundir con `GET /activity-insights` (sección 4 más abajo): ese es el perfil agregado entre todos los journals, exige varias menciones repetidas; esto es simplemente lo que el usuario dijo hoy.
 
 **`POST /journals`**
 Reemplaza `JournalRepository.submitJournal({text, entryType})`. El cliente manda el texto ya transcrito (voz on-device o escrito); el backend corre el análisis de emoción (hoy mockeado por `AiJournalService`, acá pasaría a ser una llamada real a un LLM) y persiste todo.
@@ -286,6 +288,18 @@ Detalle (usado por `PsychologistDetailScreen`).
 
 **`GET /psychologists/{id}/slots`**
 Response `200`: `[{ "id": "s1", "label": "Lun 10:00", "isBooked": false }]`. No documentado originalmente, pero necesario: `GET /psychologists` solo expone `availability` como texto (para calzar con `Psicologo.availability: List<String>` del cliente Flutter), así que sin este endpoint no habría forma de conseguir un `slotId` real para reservar. Se agrega aparte en vez de cambiar el shape de `GET /psychologists`, para no romper el modelo Dart existente.
+
+### Activity insights — actividades a reducir
+
+**`GET /activity-insights`**
+Actividades del perfil del usuario (`journal_activities`, sección 3) mencionadas ≥2 veces con carga negativa — candidatas a sugerir que el usuario reduzca, no acciones nuevas para hacer. Usa el mismo clustering por embedding que `liked_and_disliked` (sección 3) pero exige un conteo mínimo de menciones negativas en vez de solo el score neto, para no perder la señal de frecuencia cuando el score se cancela.
+
+Response `200`:
+```json
+[
+  { "activity": "reuniones de trabajo", "mentions": 3, "score": -3 }
+]
+```
 
 ### Appointments — Fase 2
 

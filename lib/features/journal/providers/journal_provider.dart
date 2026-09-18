@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../data/journal_repository.dart';
 import '../data/mock_journal_repository.dart';
 import '../data/speech_recognition_service.dart';
+import '../models/activity_insight.dart';
 import '../models/journal.dart';
 
 enum RecordingStatus { idle, recording, processing }
@@ -32,6 +35,7 @@ class JournalProvider extends ChangeNotifier {
   final JournalRepository _repository;
   final SpeechRecognitionService _speechService;
   List<Journal> _journals = [];
+  List<ActivityInsight> _activitiesToReduce = [];
   final Set<String> _feedbackGiven = {};
 
   RecordingStatus _status = RecordingStatus.idle;
@@ -47,6 +51,10 @@ class JournalProvider extends ChangeNotifier {
   List<Journal> get journals => List.unmodifiable(_journals);
 
   Journal? get latestJournal => _journals.isEmpty ? null : _journals.first;
+
+  /// Activities mentioned repeatedly with negative valence — see
+  /// `GET /activity-insights` in backend.md.
+  List<ActivityInsight> get activitiesToReduce => List.unmodifiable(_activitiesToReduce);
 
   /// Whether the user already gave 👍/👎 feedback for this recommendation.
   bool hasFeedback(String recommendationId) => _feedbackGiven.contains(recommendationId);
@@ -71,6 +79,15 @@ class JournalProvider extends ChangeNotifier {
       // No tumbamos la pantalla si el backend no está corriendo al abrir la
       // app — se queda con el historial vacío.
       debugPrint('JournalProvider: no se pudo cargar el historial ($e)');
+    }
+    await _refreshActivitiesToReduce();
+  }
+
+  Future<void> _refreshActivitiesToReduce() async {
+    try {
+      _activitiesToReduce = await _repository.fetchActivitiesToReduce();
+    } catch (e) {
+      debugPrint('JournalProvider: no se pudieron cargar las actividades a reducir ($e)');
     }
     notifyListeners();
   }
@@ -117,6 +134,7 @@ class JournalProvider extends ChangeNotifier {
     _liveTranscript = '';
     _status = RecordingStatus.idle;
     notifyListeners();
+    unawaited(_refreshActivitiesToReduce());
   }
 
   /// Same pipeline as voice, but starting from text typed by the user.
@@ -131,6 +149,7 @@ class JournalProvider extends ChangeNotifier {
 
     _journals.insert(0, journal);
     _status = RecordingStatus.idle;
+    unawaited(_refreshActivitiesToReduce());
     notifyListeners();
   }
 

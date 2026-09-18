@@ -46,6 +46,14 @@ dependencies:
   # voice journal into live streaming text while the user talks.
   speech_to_text: ^7.0.0
 
+  # Renders emojis as bundled Twemoji images instead of the OS's built-in
+  # emoji font, so EmotionBadge looks the same on every platform (Android
+  # doesn't ship Apple's emoji glyphs, and Apple's font can't be redistributed).
+  flutter_twemoji: ^1.1.0
+
+  # Mood trend chart on the dashboard (SummaryScreen).
+  fl_chart: ^0.69.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -98,3 +106,9 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+# Restricts flutter_twemoji's bundled assets to just the emojis EmotionBadge
+# uses (EmotionTypeX.emoji) so the app doesn't ship the full Twemoji set.
+# Run `dart run flutter_twemoji:include_emojis` after changing this.
+flutter_twemoji:
+  includes: '😰😟😢😌😄'

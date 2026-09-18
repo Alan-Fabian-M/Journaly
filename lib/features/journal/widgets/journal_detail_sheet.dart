@@ -99,6 +99,36 @@ Future<void> showJournalDetailSheet(BuildContext context, Journal journal) {
                 const SizedBox(height: 18),
               ],
 
+              if (journal.activitiesToAvoid.isNotEmpty) ...[
+                Text(
+                  'Para evitar',
+                  style: TextStyle(fontSize: 12, color: secondaryColor),
+                ),
+                const SizedBox(height: 8),
+                for (final activity in journal.activitiesToAvoid)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Padding(
+                          padding: EdgeInsets.only(top: 3),
+                          child: Icon(
+                            Icons.trending_down_rounded,
+                            size: 16,
+                            color: AppColors.terracotta,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(activity, style: const TextStyle(fontSize: 13, height: 1.4)),
+                        ),
+                      ],
+                    ),
+                  ),
+                const SizedBox(height: 10),
+              ],
+
               Text(
                 'Transcripción',
                 style: TextStyle(fontSize: 12, color: secondaryColor),

@@ -5,9 +5,13 @@ import '../../../shared/theme/app_colors.dart';
 import '../../../shared/widgets/section_header.dart';
 import '../models/emotion_result.dart';
 import '../providers/journal_provider.dart';
+import '../utils/journal_stats.dart';
+import '../widgets/activities_to_reduce_section.dart';
+import '../widgets/dashboard_stat_cards.dart';
 import '../widgets/emotion_badge.dart';
 import '../widgets/journal_detail_sheet.dart';
 import '../widgets/journal_history_item.dart';
+import '../widgets/mood_trend_chart.dart';
 import '../widgets/recommended_actions_section.dart';
 
 class SummaryScreen extends StatelessWidget {
@@ -20,8 +24,9 @@ class SummaryScreen extends StatelessWidget {
     final secondaryColor = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
 
     final provider = context.watch<JournalProvider>();
+    final journals = provider.journals;
     final latest = provider.latestJournal;
-    final history = provider.journals.skip(1).take(4).toList();
+    final history = journals.skip(1).take(4).toList();
 
     if (latest == null) {
       return const Center(child: Text('Aún no tienes journals registrados.'));
@@ -36,6 +41,16 @@ class SummaryScreen extends StatelessWidget {
             style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 20),
+          DashboardStatCards(
+            streak: currentStreak(journals),
+            totalEntries: journals.length,
+            dominantEmotion: dominantEmotion(journals),
+          ),
+          const SizedBox(height: 16),
+          MoodTrendChart(journals: journals),
+          const SizedBox(height: 28),
+          const SectionHeader(title: 'Último registro'),
+          const SizedBox(height: 12),
           EmotionBadge(emotion: latest.emotionResult.emotion),
           const SizedBox(height: 12),
           ClipRRect(
@@ -93,9 +108,40 @@ class SummaryScreen extends StatelessWidget {
               ),
             ),
           ),
+          if (latest.activitiesToAvoid.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            ...latest.activitiesToAvoid.map(
+              (activity) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.only(top: 3),
+                      child: Icon(
+                        Icons.trending_down_rounded,
+                        size: 16,
+                        color: AppColors.terracotta,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(activity, style: const TextStyle(fontSize: 13, height: 1.4)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
           if (latest.recommendedActions.isNotEmpty) ...[
             const SizedBox(height: 20),
             RecommendedActionsSection(actions: latest.recommendedActions),
+          ],
+          if (provider.activitiesToReduce.isNotEmpty) ...[
+            const SizedBox(height: 28),
+            const SectionHeader(title: 'Para reducir'),
+            const SizedBox(height: 12),
+            ActivitiesToReduceSection(insights: provider.activitiesToReduce),
           ],
           const SizedBox(height: 28),
           const SectionHeader(title: 'Historial reciente'),

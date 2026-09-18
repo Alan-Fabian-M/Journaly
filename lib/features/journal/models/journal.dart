@@ -17,6 +17,7 @@ class Journal {
     required this.emotionResult,
     this.durationSeconds,
     this.recommendedActions = const [],
+    this.activitiesToAvoid = const [],
   });
 
   final String id;
@@ -34,6 +35,12 @@ class Journal {
   /// engine existed.
   final List<RecommendedAction> recommendedActions;
 
+  /// Activities mentioned in THIS journal with negative valence — "what to
+  /// avoid" specific to this entry, the inverse of `emotionResult.
+  /// suggestions`. Not the aggregated cross-journal profile (see
+  /// `JournalProvider.activitiesToReduce` / `GET /activity-insights`).
+  final List<String> activitiesToAvoid;
+
   /// Parses a journal object as returned by the backend (see backend.md
   /// section 4, `GET/POST /journals`).
   factory Journal.fromJson(Map<String, dynamic> json) {
@@ -48,6 +55,7 @@ class Journal {
       recommendedActions: (json['recommendedActions'] as List? ?? [])
           .map((e) => RecommendedAction.fromJson(e as Map<String, dynamic>))
           .toList(),
+      activitiesToAvoid: (json['activitiesToAvoid'] as List? ?? []).cast<String>(),
     );
   }
 }
