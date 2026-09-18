@@ -35,6 +35,17 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
 
+  # Simple state management for the Journaly MVP.
+  provider: ^6.1.2
+
+  # HTTP client reserved for the real backend integration (ApiJournalRepository /
+  # ApiPsychologistRepository). Not called anywhere yet in this MVP.
+  dio: ^5.7.0
+
+  # On-device speech recognition (real, no backend needed) used to turn the
+  # voice journal into live streaming text while the user talks.
+  speech_to_text: ^7.0.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
