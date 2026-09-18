@@ -75,7 +75,7 @@ Catálogo reutilizable de acciones/técnicas de afrontamiento — independiente 
 | title | text | ej. "Respiración 4-7-8" |
 | description | text | |
 | category | enum('respiracion','cognitivo','fisico','social','ayuda_profesional') | |
-| embedding | vector, nullable | opcional, ver sección 3.1 (matching por embeddings) |
+| embedding | vector(256), nullable | de `title`+`description`, generado una vez al sembrar el catálogo (`text-embedding-3-small` vía OpenRouter) |
 | created_at | timestamptz | |
 
 ### `coping_action_emotion_tags`
@@ -103,7 +103,7 @@ Snapshot histórico de qué acciones del catálogo se recomendaron a qué journa
 | created_at | timestamptz | |
 
 ### `action_feedback`
-El feedback loop: si el usuario marca que una recomendación le sirvió o no. Sin esto no hay forma de mejorar el matching con datos reales.
+El usuario puede marcar que una recomendación le sirvió o no (👍/👎 en el cliente). Se sigue guardando, pero **ya no es la fuente que usa el motor de matching** — ver `journal_activities` más abajo y sección 3.
 
 | Campo | Tipo | Notas |
 |---|---|---|
@@ -111,6 +111,19 @@ El feedback loop: si el usuario marca que una recomendación le sirvió o no. Si
 | journal_action_recommendation_id | uuid (FK → journal_action_recommendations.id) | |
 | user_id | uuid (FK → users.id) | |
 | was_helpful | boolean, nullable | null = sin responder |
+| created_at | timestamptz | |
+
+### `journal_activities`
+La fuente real de personalización: actividades que el usuario menciona explícitamente en un journal (algo que hizo o va a hacer) junto con cómo lo hicieron sentir, extraídas por el LLM al analizar el texto (ver `EmotionAnalysisResult.activities` en `emotion_analysis.py`). Con esto se arma, por usuario, un perfil de "qué le gusta / qué no le gusta" sin necesidad de que reaccione a ninguna sugerencia.
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| id | uuid (PK) | |
+| journal_id | uuid (FK → journals.id) | |
+| user_id | uuid (FK → users.id) | denormalizado, para agregar por usuario sin joinear por journals |
+| activity | text | ej. "caminar por el parque", "reuniones de trabajo" |
+| valence | enum('positiva','negativa','neutral') | cómo pareció hacerlo sentir, según el texto |
+| embedding | vector(256), nullable | generado al crear el journal; null si no hay `OPENROUTER_API_KEY` o falló la llamada |
 | created_at | timestamptz | |
 
 ### `psychologists`
@@ -151,6 +164,7 @@ Mapea a `Psicologo` ([psicologo.dart](lib/features/psychologists/models/psicolog
 ```
 users 1───* journals 1───1 emotion_results 1───* emotion_suggestions
                        │                    └──* emotion_keywords
+                       ├──* journal_activities
                        └──* journal_action_recommendations *───1 coping_actions
                                                    │
                                                    └──* action_feedback
@@ -165,14 +179,29 @@ users 1───* appointments *───1 psychologists
 
 ## 3. Motor de matching emoción → acción
 
-Dos enfoques, de más simple a más avanzado — el primero alcanza para tener recomendaciones reales desde el día uno del backend:
+Reglas + personalización por actividades, con dos capas que se combinan sin doble conteo (implementado, `app/services/matching.py`):
 
-1. **Basado en reglas + personalización por usuario (implementado).** Al analizar un journal: tomar `emotion_results.emotion_type` + `intensity`, filtrar `coping_action_emotion_tags` donde `emotion_type` coincida y `intensity` caiga entre `min_intensity`/`max_intensity`. A cada candidato se le suma un ajuste por usuario calculado a partir de su propio `action_feedback` histórico con esa misma `coping_action` (`+0.15` por cada 👍, `-0.15` por cada 👎, acumulable), se ordena por ese score ajustado y se toma el top-N — guardado en `journal_action_recommendations` con el score ya personalizado. Implementación: `app/services/matching.py`. Es determinístico, fácil de depurar, y mejora con el uso sin necesitar reentrenar nada.
-2. **Basado en embeddings (evolución posterior, no implementado).** Comparar el embedding del journal/keywords contra `coping_actions.embedding` por similitud coseno (ej. Postgres + `pgvector`), para capturar matches semánticos que las reglas fijas no cubren (ej. un journal sobre "conflicto con mi pareja" matcheando con una acción etiquetada "social" aunque las palabras no coincidan literalmente). Requiere generar embeddings tanto del journal como del catálogo con el mismo modelo.
+1. **Base por reglas.** Al analizar un journal: tomar `emotion_results.emotion_type` + `intensity`, filtrar `coping_action_emotion_tags` donde `emotion_type` coincida y `intensity` caiga entre `min_intensity`/`max_intensity`.
+2. **Ajuste semántico (pgvector).** Para cada candidato con `embedding`, se compara por similitud coseno contra los clusters de actividades del usuario (`app/services/activity_profile.py`) — si superan el umbral (`0.40`, calibrado empíricamente: pares relacionados dieron ~0.50-0.56, no relacionados ~0.25-0.30), se suma `0.1 * score_neto_clamped(-2,2) * similitud`.
+3. **Ajuste por palabras (fallback).** Para actividades/acciones sin `embedding` (sin `OPENROUTER_API_KEY`, o falló la llamada): overlap simple de palabras ≥4 letras entre la actividad y el título/descripción/categoría de la acción, mismo peso `0.1 * score_neto`.
+
+Se ordena por el score ajustado y se toma el top-N — guardado en `journal_action_recommendations`. **Importante**: esto reemplazó un enfoque anterior basado en `action_feedback` (👍/👎) — la fuente de personalización son los journals mismos (ver `journal_activities` arriba), no la reacción del usuario a una sugerencia puntual. `action_feedback` se sigue guardando pero no influye el ranking.
+
+### Clustering de actividades (`app/services/activity_profile.py`, implementado)
+
+Las actividades se agrupan por similitud coseno de embedding en vez de coincidencia exacta de texto (para que "reunión de trabajo" y "reuniones de trabajo" cuenten como lo mismo). Umbral `0.65`, también calibrado empíricamente: "reunión de trabajo" vs "reuniones de trabajo" dio 0.889, vs "reuniones" dio 0.719, vs "caminar por el parque"/"caminar" dio 0.668 — mientras que actividades genuinamente distintas ("caminar por el parque" vs "salir a correr") dieron 0.552 y pares no relacionados ~0.25-0.30. Filas sin embedding caen a agrupamiento por texto exacto.
+
+### Extracción de actividades (implementado)
+
+Cuando hay `OPENROUTER_API_KEY` configurada, `emotion_analysis.analyze()` le pide al LLM (además de la emoción/feedback/sugerencias) hasta 4 actividades que el texto mencione explícitamente, cada una con su `valence` (`positiva|negativa|neutral`). Cada una se persiste como una fila en `journal_activities`. La heurística de iteración 1 no extrae actividades (devuelve lista vacía) — es una tarea de NLP que no le corresponde.
 
 ### Contexto histórico en la detección de emoción (implementado)
 
-`POST /journals` ya no analiza cada journal aislado: antes de llamar a `emotion_analysis.analyze()`, el router junta los últimos 5 journals del usuario (fecha + emoción + resumen) y se los pasa como contexto al LLM (solo cuando hay `OPENROUTER_API_KEY` configurada — la heurística de iteración 1 ignora este contexto, no lo necesita). Esto le permite al modelo notar patrones ("este usuario reporta estrés seguido los lunes") en vez de tratar cada entrada como si no supiera nada de la persona. Implementación: `analyze(text, history=...)` en `app/services/emotion_analysis.py`.
+`POST /journals` ya no analiza cada journal aislado: antes de llamar a `emotion_analysis.analyze()`, el router arma un `history: list[str]` con dos partes, en este orden:
+1. Preferencias conocidas del usuario (`activity_profile.liked_and_disliked(...)`): `"Le gusta: ..."` / `"No le gusta / le genera malestar: ..."`.
+2. Los últimos 5 journals del usuario (fecha + emoción + resumen).
+
+Todo esto solo se arma/usa cuando hay `OPENROUTER_API_KEY` configurada — la heurística de iteración 1 ignora `history`, no lo necesita. Esto le permite al modelo notar patrones ("este usuario reporta estrés seguido los lunes", "salir a caminar históricamente lo calma") en vez de tratar cada entrada como si no supiera nada de la persona. Implementación: `analyze(text, history=...)` en `app/services/emotion_analysis.py`.
 
 ## 4. Endpoints REST
 
@@ -302,12 +331,11 @@ Necesario únicamente para que `user_id` tenga sentido en el resto del schema. N
 
 | Pieza | Recomendación | Por qué |
 |---|---|---|
-| Backend framework | **Python + FastAPI** | Liviano para levantar rápido los endpoints ya documentados; el ecosistema Python (numpy, sentence-transformers, clientes de OpenAI/Anthropic) es el más directo si el análisis de emoción o el matching por embeddings se implementan in-house en vez de solo consumir una API externa. |
-| Base de datos | **PostgreSQL** | Encaja con el schema relacional (FKs, enums) ya diseñado arriba; con la extensión **pgvector** soporta directamente las columnas `embedding` de `coping_actions`/journals cuando se pase al matching semántico (sección 3, enfoque 2), sin migrar de motor de base de datos. |
-| Alternativa | Node.js + NestJS | Razonable si el equipo prefiere TypeScript end-to-end por consistencia; pierde un poco de fricción en la parte de embeddings/ML frente a Python. |
+| Backend framework | **Python + FastAPI** (implementado) | Liviano para levantar rápido los endpoints; el ecosistema Python hace directo llamar a OpenRouter tanto para chat (emoción) como para embeddings (matching semántico). |
+| Base de datos | **PostgreSQL en Neon + pgvector** (implementado) | Free tier, sin instalar nada local, `CREATE EXTENSION vector` ya habilitada. Las columnas `embedding` de `coping_actions`/`journal_activities` son `vector(256)` nativas — ver sección 3. SQLite sigue existiendo como fallback de cero-setup (`database.py: embedding_column_type()` cae a `JSON` en ese caso, sin romper nada, solo sin índices nativos de pgvector). |
+| Embeddings | **`openai/text-embedding-3-small` vía OpenRouter, 256 dims** (implementado) | Mismo proveedor/key que el análisis de emoción; 256 dims (parámetro `dimensions`) mantiene el storage/cómputo liviano para un catálogo chico — la similitud se calcula en Python (coseno), no con los operadores SQL de pgvector, por simplicidad a esta escala. |
+| Alternativa backend | Node.js + NestJS | Razonable si el equipo prefiere TypeScript end-to-end por consistencia; pierde un poco de fricción en la parte de embeddings/ML frente a Python. |
 | Auth (cuando se implemente) | JWT vía `POST /auth/login`, verificado en cada endpoint que dependa de `user_id` | Estándar, compatible con `Authorization: Bearer <token>` desde `ApiClient` (Dio) en el cliente. |
-
-Este stack es una recomendación, no una decisión cerrada — el schema y los endpoints documentados arriba no dependen de esta elección específica.
 
 ## 7. Fuera de alcance explícito
 
